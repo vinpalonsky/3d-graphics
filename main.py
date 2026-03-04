@@ -1,5 +1,6 @@
 import pygame
 from math import cos, sin, pi
+from functions import read_svg_paths
 
 W_WIDTH = 900
 W_HEIGHT = 600
@@ -27,6 +28,9 @@ MOVE_CAMERA_UP = 1
 MOVE_CAMERA_DOWN = 2
 MOVE_CAMERA_LEFT = 3
 MOVE_CAMERA_RIGHT = 4
+
+PATH_POINTS = 300
+SVG_CENTER = (W_WIDTH/2, W_HEIGHT/2, 0)
 
 pygame.init()
 surface = pygame.display.set_mode((W_WIDTH, W_HEIGHT))
@@ -73,14 +77,14 @@ def rotate_point(point, M):
 		new_point[i] = sum
 	return (new_point[0], new_point[1], new_point[2])
 
-def apply_perspective(points):
+def apply_perspective(points, center):
 	for p in range(len(points)):
 		point = points[p]
 
 		ac = (point[0]-CAMERA_POS[0], point[1]-CAMERA_POS[1], point[2]-CAMERA_POS[2])
 		d = rotate_point(rotate_point(rotate_point(ac, Mz(CAMERA_ANGLE[2])), My(CAMERA_ANGLE[1])), Mx(CAMERA_ANGLE[0]))
 		if d[2]==0: d = (d[0], d[1], 0.001)
-		new_point = (DISPLAY_SURFACE_POS[2]/d[2]*d[0]+DISPLAY_SURFACE_POS[0], DISPLAY_SURFACE_POS[2]/d[2]*d[1]+DISPLAY_SURFACE_POS[1], point[2])
+		new_point = (DISPLAY_SURFACE_POS[2]/d[2]*d[0]+DISPLAY_SURFACE_POS[0] + center[0], DISPLAY_SURFACE_POS[2]/d[2]*d[1]+DISPLAY_SURFACE_POS[1] + center[1])
 
 		points[p] = new_point
 
@@ -91,6 +95,14 @@ def main():
 
 	cube_points = []
 	initialize_cube(cube_points)
+
+	paths = read_svg_paths("svg_imgs/drawings.svg")
+	paths_points = [[[]] for _ in range(len(paths))]
+	for p in range(len(paths)):
+		paths_points[p].append(paths[p][1])
+		for t in range(PATH_POINTS):
+			point = paths[p][0].point(t/PATH_POINTS)
+			paths_points[p][0].append((point.real, point.imag, 0))
 
 	while running:
 		for event in pygame.event.get():
@@ -158,12 +170,15 @@ def main():
 			CAMERA_ANGLE[2]-=pi/180
 
 		new_cube_points = [cube_point for cube_point in cube_points]
-		apply_perspective(new_cube_points)
+		apply_perspective(new_cube_points, CUBE_CENTER)
 
 		for point in new_cube_points:
-			x = point[0]+CUBE_CENTER[0]
-			y = point[1]+CUBE_CENTER[1]
-			pygame.draw.circle(surface, GRAPHICS_COLOR, (x, y), 1)
+			pygame.draw.circle(surface, GRAPHICS_COLOR, (point[0], point[1]), 1)
+
+		for path_points in paths_points:
+			new_path_points = [path_point for path_point in path_points[0]]
+			apply_perspective(new_path_points, SVG_CENTER)
+			pygame.draw.lines(surface, pygame.Color(path_points[1]), False, new_path_points)
 
 		pygame.display.flip()
 
